@@ -1,0 +1,18 @@
+# Chrome packaging output and signing key. Never commit the .pem:
+# it's the private key that proves future updates come from you.
+*.crx
+*.pem
+*.zip
+dist/
+
+# If you later add tests or a build step
+node_modules/
+coverage/
+*.log
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

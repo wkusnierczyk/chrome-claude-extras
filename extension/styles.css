@@ -1,0 +1,67 @@
+.cmd-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+.cmd-bar-standalone {
+  display: flex;
+  margin: 4px 0 8px;
+}
+
+.cmd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  font: 500 12px/1 inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.12s, background-color 0.12s;
+}
+
+.cmd-btn:hover,
+.cmd-btn:focus-visible {
+  opacity: 1;
+  background: rgba(127, 127, 127, 0.14);
+  outline: none;
+}
+
+.cmd-btn:disabled {
+  opacity: 0.35;
+  cursor: progress;
+}
+
+.cmd-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #1f1e1d;
+  color: #f5f4ef;
+  font: 13px/1.4 system-ui, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: opacity 0.4s;
+}
+
+.cmd-toast-out {
+  opacity: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cmd-toast {
+    background: #f5f4ef;
+    color: #1f1e1d;
+  }
+}

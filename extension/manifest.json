@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Extras for Claude",
+  "version": "1.0.0",
+  "description": "Small additions to claude.ai. Currently: download any reply as markdown, or ask Claude for a .md file.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "capture.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "html2md.js",
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
