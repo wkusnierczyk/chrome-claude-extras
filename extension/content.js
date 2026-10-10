@@ -9,6 +9,9 @@
     // A whole assistant turn. In Code sessions (claude.ai/code) this is the only
     // marker; there are no font-claude-* classes there.
     message: '[data-testid="assistant-message"]',
+    // The prose blocks of a Code-session turn: its text, without the tool-call
+    // rows and action buttons that sit beside it.
+    messageText: ".prose",
     streaming: '[data-is-streaming="true"]',
     finished: '[data-is-streaming="false"]',
     copyButton: [
@@ -125,6 +128,16 @@
     return null;
   }
 
+  // The parts of a reply that are its text. A regular chat's reply body is all
+  // text; a Code-session turn also holds tool-call rows and its action bar.
+  function textParts(responseEl) {
+    if (!responseEl.matches(SEL.message)) return [responseEl];
+    const parts = [...responseEl.querySelectorAll(SEL.messageText)].filter(
+      (el) => !el.parentElement.closest(SEL.messageText)
+    );
+    return parts.length ? parts : [responseEl];
+  }
+
   function isLatestResponse(responseEl) {
     const messages = document.querySelectorAll(SEL.message);
     if (messages.length) return messages[messages.length - 1].contains(responseEl);
@@ -138,7 +151,12 @@
     button.disabled = true;
     try {
       let md = await captureViaCopyButton(copyBtn);
-      if (!md || !md.trim()) md = globalThis.cmdHtmlToMarkdown(responseEl);
+      if (!md || !md.trim()) {
+        md = textParts(responseEl)
+          .map((el) => globalThis.cmdHtmlToMarkdown(el).trim())
+          .filter(Boolean)
+          .join("\n\n");
+      }
       if (!md.endsWith("\n")) md += "\n";
       const filename = slugFromMarkdown(md) + ".md";
       downloadText(md, filename);
@@ -156,7 +174,10 @@
     if (isLatestResponse(responseEl)) {
       prompt = "Write your last reply down as a markdown (.md) file.";
     } else {
-      const snippet = (responseEl.innerText ?? responseEl.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+      const snippet = textParts(responseEl)
+        .map((el) => el.innerText ?? el.textContent ?? "")
+        .join(" ")
+        .replace(/\s+/g, " ").trim().slice(0, 80);
       prompt = `Write your earlier reply that begins with "${snippet}…" down as a markdown (.md) file.`;
     }
 
