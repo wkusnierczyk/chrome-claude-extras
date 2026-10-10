@@ -8,7 +8,7 @@ Not affiliated with or endorsed by Anthropic. "Claude" is a trademark of Anthrop
 
 ### Markdown buttons
 
-Two buttons under every reply, next to the native Copy button.
+Two buttons under every reply, next to the native Copy button. Works in regular chats and in Claude Code sessions on the web (claude.ai/code). In Code sessions a reply's actions, and so these buttons, appear when you hover over the reply.
 
 | Button | What it does |
 |---|---|
@@ -43,12 +43,13 @@ claude.ai's markup is not a public API, so an update to the site can break the b
 | Key | Finds |
 |---|---|
 | `response` | The rendered body of a Claude reply |
+| `message` | A whole assistant turn; the only reply marker in Code sessions |
 | `streaming`, `finished` | Reply wrappers while generating and once done |
 | `copyButton` | Claude's native Copy button in the action bar |
 | `composer` | The message input |
 | `sendButton` | The Send button |
 
-If the native Copy button stops being recognised, buttons still appear in a fallback row under each finished reply, using the HTML converter.
+If the native Copy button stops being recognised, buttons still appear in a fallback row under each finished reply in regular chats, using the HTML converter.
 
 ## Files
 
