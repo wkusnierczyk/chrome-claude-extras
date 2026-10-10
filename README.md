@@ -8,12 +8,13 @@ Not affiliated with or endorsed by Anthropic. "Claude" is a trademark of Anthrop
 
 ### Markdown buttons
 
-Two buttons under every reply, next to the native Copy button. Works in regular chats and in Claude Code sessions on the web (claude.ai/code). In Code sessions a reply's actions, and so these buttons, appear when you hover over the reply.
+Three buttons under every reply, next to the native Copy button. Works in regular chats and in Claude Code sessions on the web (claude.ai/code). In Code sessions a reply's actions, and so these buttons, appear when you hover over the reply.
 
 | Button | What it does |
 |---|---|
 | **⤓ .md** | Downloads that reply as a markdown file, instantly, without another turn. The file name comes from the reply's first heading. |
 | **✎ .md** | Types and sends a prompt asking Claude to write that reply as a `.md` file, so Claude produces a proper file in the chat. |
+| **✎ .pdf** | Types and sends a prompt asking Claude to write that reply up as a PDF document: a title, sections and no chat asides, with the reply's content kept. Claude produces the `.pdf` in the chat. |
 
 ## Install
 
@@ -30,7 +31,7 @@ It works in any Chromium browser that supports Manifest V3 with `world: "MAIN"` 
 
 If the Copy button can't be found or doesn't respond within 1.5 seconds, the extension converts the rendered HTML to markdown instead (`html2md.js`). That covers headings, emphasis, links, nested lists, code blocks, tables and quotes, but is less exact than the native copy.
 
-**Ask.** The prompt is inserted into the message box with `execCommand("insertText")`, which the ProseMirror editor treats like real typing, then the Send button is clicked. For the latest reply the prompt says "your last reply". For older replies it quotes the reply's first 80 characters so Claude knows which one you mean. If the Send button doesn't become active, the prompt stays in the box and you press Enter yourself.
+**Ask.** The prompt is inserted into the message box with `execCommand("insertText")`, which the ProseMirror editor treats like real typing, then the Send button is clicked. For the latest reply the prompt says "your last reply". For older replies it quotes the reply's first 80 characters so Claude knows which one you mean. The .pdf button does no rendering in the browser: a chat reply printed verbatim makes a poor document, so it asks Claude to write one from the reply instead. If the Send button doesn't become active, the prompt stays in the box and you press Enter yourself.
 
 ## Privacy
 
