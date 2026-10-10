@@ -12,8 +12,8 @@ Two buttons under every reply, next to the native Copy button. Works in regular 
 
 | Button | What it does |
 |---|---|
-| **.md** | Downloads that reply as a markdown file, instantly, without another turn. The file name comes from the reply's first heading. |
-| **Ask .md** | Types and sends a prompt asking Claude to write that reply as a `.md` file, so Claude produces a proper file in the chat. |
+| **⤓ .md** | Downloads that reply as a markdown file, instantly, without another turn. The file name comes from the reply's first heading. |
+| **✎ .md** | Types and sends a prompt asking Claude to write that reply as a `.md` file, so Claude produces a proper file in the chat. |
 
 ## Install
 

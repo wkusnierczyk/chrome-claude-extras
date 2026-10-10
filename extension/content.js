@@ -1,6 +1,6 @@
 // Adds two buttons under every finished Claude reply:
-//   ".md"      – downloads that reply as a markdown file, instantly, in the browser
-//   "Ask .md"  – sends Claude a prompt asking it to write that reply as a .md file
+//   "⤓ .md"    – downloads that reply as a markdown file, instantly, in the browser
+//   "✎ .md"    – sends Claude a prompt asking it to write that reply as a .md file
 (() => {
   // claude.ai's markup is not a public API. If an update breaks the buttons,
   // these selectors are the place to fix it.
@@ -40,7 +40,7 @@
   const ICON_DOWNLOAD =
     '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0 4-4m-4 4-4-4M4 16h12"/></svg>';
   const ICON_ASK =
-    '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h6l4 4v10H6z"/><path d="M12 3v4h4M8.5 11h5M8.5 14h3"/></svg>';
+    '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 3.5a1.8 1.8 0 0 1 2.5 2.5L7 15l-3.5 1 1-3.5z"/><path d="M12 5l3 3"/></svg>';
 
   // ---------- helpers ----------
 
@@ -230,7 +230,7 @@
       onDownload(responseEl, copyBtn, dl);
     });
 
-    const ask = makeButton(ICON_ASK, "Ask .md", "Ask Claude to write this reply as a .md file");
+    const ask = makeButton(ICON_ASK, ".md", "Ask Claude to write this reply as a .md file");
     ask.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
