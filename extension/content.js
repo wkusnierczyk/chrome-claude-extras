@@ -1,6 +1,7 @@
-// Adds two buttons under every finished Claude reply:
+// Adds three buttons under every finished Claude reply:
 //   "⤓ .md"    – downloads that reply as a markdown file, instantly, in the browser
 //   "✎ .md"    – sends Claude a prompt asking it to write that reply as a .md file
+//   "✎ .pdf"   – sends Claude a prompt asking it to write that reply as a PDF document
 (() => {
   // claude.ai's markup is not a public API. If an update breaks the buttons,
   // these selectors are the place to fix it.
@@ -169,17 +170,29 @@
     }
   }
 
-  async function onAsk(responseEl) {
-    let prompt;
+  // What each Ask button asks for, after naming the reply ("your last reply" or
+  // a quote of an earlier one). A PDF is meant for print, so Claude is asked to
+  // write a document from the reply rather than copy the chat text verbatim.
+  const ASK = {
+    md: (reply) => `Write ${reply} down as a markdown (.md) file.`,
+    pdf: (reply) =>
+      `Write ${reply} up as a PDF document. Give it a title and sections, ` +
+      "drop conversational asides and references to earlier messages, and keep " +
+      "its content and conclusions. Produce it as a .pdf file.",
+  };
+
+  async function onAsk(responseEl, format) {
+    let reply;
     if (isLatestResponse(responseEl)) {
-      prompt = "Write your last reply down as a markdown (.md) file.";
+      reply = "your last reply";
     } else {
       const snippet = textParts(responseEl)
         .map((el) => el.innerText ?? el.textContent ?? "")
         .join(" ")
         .replace(/\s+/g, " ").trim().slice(0, 80);
-      prompt = `Write your earlier reply that begins with "${snippet}…" down as a markdown (.md) file.`;
+      reply = `your earlier reply that begins with "${snippet}…"`;
     }
+    const prompt = ASK[format](reply);
 
     const composer = findComposer();
     if (!composer) {
@@ -230,14 +243,21 @@
       onDownload(responseEl, copyBtn, dl);
     });
 
-    const ask = makeButton(ICON_ASK, ".md", "Ask Claude to write this reply as a .md file");
-    ask.addEventListener("click", (e) => {
+    const askMd = makeButton(ICON_ASK, ".md", "Ask Claude to write this reply as a .md file");
+    askMd.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      onAsk(responseEl);
+      onAsk(responseEl, "md");
     });
 
-    bar.append(dl, ask);
+    const askPdf = makeButton(ICON_ASK, ".pdf", "Ask Claude to write this reply as a PDF document");
+    askPdf.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onAsk(responseEl, "pdf");
+    });
+
+    bar.append(dl, askMd, askPdf);
     return bar;
   }
 
