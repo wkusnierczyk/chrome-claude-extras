@@ -6,6 +6,9 @@
   // these selectors are the place to fix it.
   const SEL = {
     response: ".font-claude-response, .font-claude-message",
+    // A whole assistant turn. In Code sessions (claude.ai/code) this is the only
+    // marker; there are no font-claude-* classes there.
+    message: '[data-testid="assistant-message"]',
     streaming: '[data-is-streaming="true"]',
     finished: '[data-is-streaming="false"]',
     copyButton: [
@@ -14,15 +17,18 @@
       'button[aria-label="Copy response"]',
     ].join(", "),
     composer: [
+      '[data-testid="code-prompt-input"]',
       'div[contenteditable="true"].ProseMirror',
       '[data-testid="chat-input"] [contenteditable="true"]',
       'div[contenteditable="true"]',
     ],
     sendButton: [
+      'button[data-testid="code-prompt-send"]',
       'button[aria-label="Send message"]',
       'button[aria-label="Send Message"]',
       'button[data-testid="send-button"]',
-      'button[aria-label*="Send"]',
+      // Code sessions also have a "Send feedback" button; never click that.
+      'button[aria-label*="Send"]:not([aria-label*="feedback" i])',
     ],
   };
 
@@ -120,6 +126,8 @@
   }
 
   function isLatestResponse(responseEl) {
+    const messages = document.querySelectorAll(SEL.message);
+    if (messages.length) return messages[messages.length - 1].contains(responseEl);
     const all = document.querySelectorAll(SEL.response);
     return all.length && all[all.length - 1] === responseEl;
   }
@@ -214,6 +222,9 @@
 
   // From a Copy button, find the single Claude reply it belongs to.
   function responseForCopyButton(btn) {
+    // Code sessions: the turn itself is the reply (it has no separate body element).
+    const message = btn.closest(SEL.message);
+    if (message) return message.querySelector(SEL.response) || message;
     let node = btn.parentElement;
     for (let i = 0; node && i < 12; i++, node = node.parentElement) {
       const found = node.querySelectorAll(SEL.response);
@@ -245,7 +256,9 @@
     }
 
     // Fallback: finished replies that still have no recognisable Copy button
-    // two seconds after finishing.
+    // two seconds after finishing. Not used in Code sessions: there a running
+    // turn flips to data-is-streaming="false" while it waits on a tool, and the
+    // Copy button only renders on hover, which the primary path handles.
     const now = Date.now();
     for (const wrapper of document.querySelectorAll(SEL.finished)) {
       const responseEl = wrapper.querySelector(SEL.response);
