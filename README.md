@@ -6,7 +6,7 @@ Not affiliated with or endorsed by Anthropic. "Claude" is a trademark of Anthrop
 
 ## Features
 
-### Markdown buttons
+### Reply buttons
 
 Three buttons under every reply, next to the native Copy button. Works in regular chats and in Claude Code sessions on the web (claude.ai/code). In Code sessions a reply's actions, and so these buttons, appear when you hover over the reply.
 
@@ -25,7 +25,7 @@ Three buttons under every reply, next to the native Copy button. Works in regula
 
 It works in any Chromium browser that supports Manifest V3 with `world: "MAIN"` content scripts (Chrome 111+, Edge, Brave, Arc).
 
-## How the markdown buttons work
+## How the reply buttons work
 
 **Download.** The reply's original markdown is already available through Claude's own Copy button. The extension briefly arms a hook on `navigator.clipboard` (running in the page's own JS world, `capture.js`), programmatically clicks Copy, and catches the text before it reaches your clipboard. Your clipboard is left untouched. Arming uses a `data-cmd-arm` attribute on `<html>` because the DOM is shared with the extension's isolated world and, unlike `postMessage`, is synchronous, so the hook is armed before the click fires.
 
