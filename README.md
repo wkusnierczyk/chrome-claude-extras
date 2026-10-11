@@ -8,13 +8,14 @@ Not affiliated with or endorsed by Anthropic. "Claude" is a trademark of Anthrop
 
 ### Reply buttons
 
-Three buttons under every reply, next to the native Copy button. Works in regular chats and in Claude Code sessions on the web (claude.ai/code). In Code sessions a reply's actions, and so these buttons, appear when you hover over the reply.
+Four buttons under every reply, next to the native Copy button. Works in regular chats and in Claude Code sessions on the web (claude.ai/code). In Code sessions a reply's actions, and so these buttons, appear when you hover over the reply.
 
 | Button | What it does |
 |---|---|
 | **⤓ .md** | Downloads that reply as a markdown file, instantly, without another turn. The file name comes from the reply's first heading. |
 | **✎ .md** | Types and sends a prompt asking Claude to write that reply as a `.md` file, so Claude produces a proper file in the chat. |
 | **✎ .pdf** | Types and sends a prompt asking Claude to write that reply up as a PDF document: a title, sections and no chat asides, with the reply's content kept. Claude produces the `.pdf` in the chat. |
+| **⚔ Critique** | Types and sends a prompt asking Claude to critically review that reply: evidence for and against its claims, and whether opinions on it converge or are polarised. |
 
 ## Install
 

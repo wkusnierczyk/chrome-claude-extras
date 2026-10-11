@@ -1,7 +1,8 @@
-// Adds three buttons under every finished Claude reply:
-//   "⤓ .md"    – downloads that reply as a markdown file, instantly, in the browser
-//   "✎ .md"    – sends Claude a prompt asking it to write that reply as a .md file
-//   "✎ .pdf"   – sends Claude a prompt asking it to write that reply as a PDF document
+// Adds four buttons under every finished Claude reply:
+//   "⤓ .md"      – downloads that reply as a markdown file, instantly, in the browser
+//   "✎ .md"      – sends Claude a prompt asking it to write that reply as a .md file
+//   "✎ .pdf"     – sends Claude a prompt asking it to write that reply as a PDF document
+//   "⚔ Critique" – sends Claude a prompt asking it to critically review that reply
 (() => {
   // claude.ai's markup is not a public API. If an update breaks the buttons,
   // these selectors are the place to fix it.
@@ -42,6 +43,9 @@
     '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0 4-4m-4 4-4-4M4 16h12"/></svg>';
   const ICON_ASK =
     '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 3.5a1.8 1.8 0 0 1 2.5 2.5L7 15l-3.5 1 1-3.5z"/><path d="M12 5l3 3"/></svg>';
+  // Crossed sabers; the second blade is broken where it passes under the first.
+  const ICON_CRITIQUE =
+    '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.50 13.50Q6.50 9.00 4.00 2.50M6.50 13.50Q7.69 12.73 8.75 11.91M11.28 9.69Q14.47 6.46 16.00 2.50M12 15l3-3M13.5 13.5l2.8 2.8M12 15q.9 2.3 4.3 1.3M8 15l-3-3M6.5 13.5l-2.8 2.8M8 15q-.9 2.3-4.3 1.3"/></svg>';
 
   // ---------- helpers ----------
 
@@ -179,6 +183,9 @@
       `Write ${reply} up as a PDF document. Give it a title and sections, ` +
       "drop conversational asides and references to earlier messages, and keep " +
       "its content and conclusions. Produce it as a .pdf file.",
+    critique: (reply) =>
+      `Critically review ${reply}. Provide evidence for and against its claims. ` +
+      "Clarify whether opinions about it converge or are polarised.",
   };
 
   async function onAsk(responseEl, format) {
@@ -257,7 +264,14 @@
       onAsk(responseEl, "pdf");
     });
 
-    bar.append(dl, askMd, askPdf);
+    const critique = makeButton(ICON_CRITIQUE, "Critique", "Ask Claude to critically review this reply");
+    critique.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onAsk(responseEl, "critique");
+    });
+
+    bar.append(dl, askMd, askPdf, critique);
     return bar;
   }
 
