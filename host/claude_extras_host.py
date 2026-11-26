@@ -72,6 +72,12 @@ def main():
     message = read_message()
     if message is None:
         return
+    if message.get("type") == "get":
+        # One session, by its Remote Control id: the rail section's request.
+        wanted = message.get("bridgeSessionId")
+        session = next((s for s in list_sessions() if s.get("bridgeSessionId") == wanted), None)
+        send_message({"session": session})
+        return
     if message.get("type") != "list":
         send_message({"error": f"unknown request: {message.get('type')!r}"})
         return

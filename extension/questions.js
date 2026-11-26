@@ -9,29 +9,56 @@
   // rail's own sections at run time, so it follows the site's styling.
   const SEL = {
     section: "section[data-rail-section]",
+    // A section's card. The rail draws the line above a section from this
+    // attribute on its card, so the section's own card carries it too.
     card: "[data-rail-card]",
-    // The header row, its toggle button, and a section's list body.
+    cardAttr: "data-rail-card",
+    // The header row, its fold button, and the chevron icon inside it.
     headerRow: ":scope > div:first-child",
     headerButton: "button",
+    chevron: 'button > [data-cds="Icon"]',
+    // A section's list body, and one row of it, e.g. a file under Outputs.
     listBody: "[data-rail-panel] > div",
-    // One row of a section's list, e.g. a file under Outputs.
     row: "[data-rail-panel] span[role][tabindex]",
+    // The section to go after, by its title; else the rail's second.
+    anchorTitle: "Context",
     composer: [
       '[data-testid="code-prompt-input"]',
       'div[contenteditable="true"].ProseMirror',
+      '[data-testid="chat-input"] [contenteditable="true"]',
       'div[contenteditable="true"]',
     ],
   };
+  // The list classes where no section has an open list to copy them from
+  // (Outputs and Changes folded), as the rail had them.
+  const FALLBACK = {
+    listBody: "flex flex-col pt-1 px-sm",
+    row: "flex min-h-6.5 w-full min-w-0 items-center gap-sm px-xs text-body rounded hover:bg-fill-ghost-hover",
+  };
+  // A folded section's chevron points right; an open one's shows on hover.
+  const CHEVRON_FOLDED = ["-rotate-90", "page-rtl:rotate-90"];
+  const CHEVRON_OPEN = [
+    "opacity-0",
+    "group-hover/railtop:opacity-100",
+    "group-focus-within/railtop:opacity-100",
+    "touch:opacity-100",
+  ];
 
   const POLL_MS = 3000;
   const MARK = "data-cce-questions";
   const HEADINGS = { open: "Open", progressing: "Progressing", answered: "Answered" };
 
-  let questions = null; // null until the first reply for this session
+  // What is shown, and for which session: a list is never drawn on another
+  // session's page, even for the moment before that page's first reply.
+  let shownFor = null;
+  let questions = null; // null until a reply has the session
+  let error = "";
   let lastShown = "";
   let isCollapsed = false;
   let isAnsweredOpen = false;
   let isPolling = false;
+  let timer = 0;
+  let observer = null;
 
   const sessionId = () => (location.pathname.match(/^\/code\/(session_[A-Za-z0-9]+)/) || [])[1] || null;
 
@@ -60,16 +87,29 @@
     }
   }
 
-  // Types "Q<n>: " into the message box without sending, or copies it.
+  // The visible message box, the last one, as content.js finds it; its
+  // editable element where the match is a wrapper.
+  function findComposer() {
+    for (const sel of SEL.composer) {
+      const all = [...document.querySelectorAll(sel)].filter((node) => node.offsetParent !== null);
+      if (all.length === 0) continue;
+      const box = all[all.length - 1];
+      return box.isContentEditable ? box : box.querySelector('[contenteditable="true"]');
+    }
+    return null;
+  }
+
+  // Types "Q<n>: " at the end of the message box without sending, or copies it.
   async function answer(q) {
     const text = `Q${q.n}: `;
-    const box = SEL.composer.map((s) => document.querySelector(s)).find(Boolean);
+    const box = findComposer();
     if (box) {
       box.focus();
       const sel = window.getSelection();
       sel.selectAllChildren(box);
       sel.collapseToEnd();
-      if (document.execCommand("insertText", false, text)) return;
+      const hasText = (box.innerText ?? box.textContent ?? "").trim().length > 0;
+      if (document.execCommand("insertText", false, (hasText ? " " : "") + text)) return;
     }
     try {
       await navigator.clipboard.writeText(text);
@@ -79,22 +119,36 @@
     }
   }
 
+  const titleOf = (section) => section.querySelector(SEL.headerRow)?.querySelector(SEL.headerButton)?.textContent.trim() || "";
+
   // The rail's own classes, read off a section that has a list (Outputs,
-  // Changes), else any section.
+  // Changes), else any section; the chevron from any section.
   function template() {
     const sections = [...document.querySelectorAll(SEL.section)].filter((s) => !s.closest(`[${MARK}]`));
     if (sections.length === 0) return null;
     const withRows = sections.find((s) => s.querySelector(SEL.row)) || sections[0];
     const headerRow = withRows.querySelector(SEL.headerRow);
+    const anchor = sections.find((s) => titleOf(s).startsWith(SEL.anchorTitle)) || sections[Math.min(1, sections.length - 1)];
     return {
-      anchor: sections[Math.min(1, sections.length - 1)].closest(SEL.card),
+      anchor: anchor.closest(SEL.card),
       card: withRows.closest(SEL.card)?.className || "",
       section: withRows.className,
       headerRow: headerRow?.className || "",
       headerButton: headerRow?.querySelector(SEL.headerButton)?.className || "",
-      listBody: withRows.querySelector(SEL.listBody)?.className || "",
-      row: withRows.querySelector(SEL.row)?.className || "",
+      chevron: sections.map((s) => s.querySelector(SEL.chevron)).find(Boolean) || null,
+      listBody: withRows.querySelector(SEL.listBody)?.className || FALLBACK.listBody,
+      row: withRows.querySelector(SEL.row)?.className || FALLBACK.row,
     };
+  }
+
+  function chevron(t) {
+    if (!t.chevron) return null;
+    const icon = t.chevron.cloneNode(true);
+    icon.classList.remove(...CHEVRON_FOLDED, ...CHEVRON_OPEN);
+    icon.classList.add(...(isCollapsed ? CHEVRON_FOLDED : CHEVRON_OPEN));
+    if (isCollapsed) icon.removeAttribute("data-open");
+    else icon.setAttribute("data-open", "");
+    return icon;
   }
 
   function questionRow(q, t) {
@@ -117,10 +171,12 @@
     row.addEventListener("click", (event) => {
       if (!event.target.closest("a")) answer(q);
     });
+    // A held key repeats into the message box once it has the focus, where
+    // Enter would send; act on the first press only.
     row.addEventListener("keydown", (event) => {
       if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
       event.preventDefault();
-      answer(q);
+      if (!event.repeat) answer(q);
     });
     return row;
   }
@@ -133,8 +189,9 @@
     const toggle = el(
       "button",
       { className: t.headerButton, type: "button", ariaExpanded: String(!isCollapsed) },
-      el("span", { textContent: "Questions" }),
+      el("span", { className: "shrink-0", textContent: "Questions" }),
       el("span", { className: "cce-dim cce-count", textContent: questions === null ? "" : ` ${pending} open` }),
+      chevron(t),
     );
     toggle.addEventListener("click", () => {
       isCollapsed = !isCollapsed;
@@ -143,8 +200,9 @@
     });
 
     const body = el("div", { className: `${t.listBody} cce-body` });
+    if (error) body.append(el("p", { className: "cce-warn cce-note", textContent: error }));
     if (questions === null) {
-      body.append(el("p", { className: "cce-dim cce-note", textContent: "No questions from this session yet." }));
+      if (!error) body.append(el("p", { className: "cce-dim cce-note", textContent: "No questions from this session yet." }));
     } else {
       for (const state of ["open", "progressing"]) {
         const rows = byState(state);
@@ -166,67 +224,102 @@
       if (list.length === 0) body.append(el("p", { className: "cce-dim cce-note", textContent: "No questions yet." }));
     }
 
-    return el(
-      "div",
-      { className: t.card },
-      el(
-        "section",
-        { className: t.section },
-        el("div", { className: t.headerRow }, el("div", { className: "flex min-w-0 flex-1" }, toggle)),
-        isCollapsed ? null : body,
-      ),
+    const section = el(
+      "section",
+      { className: t.section },
+      el("div", { className: t.headerRow }, el("div", { className: "flex min-w-0 flex-1" }, toggle)),
+      isCollapsed ? null : body,
     );
+    if (!isCollapsed) section.setAttribute("data-open", "");
+    const card = el("div", { className: t.card }, section);
+    card.setAttribute(SEL.cardAttr, "");
+    card.setAttribute(MARK, "");
+    return card;
   }
 
-  // Puts the section after the rail's second one (Context), or redraws it
-  // when what it shows changed. A re-render of the rail that drops it puts
-  // it back on the next mutation.
+  // Forgets what was shown when the page moved to another session.
+  function follow() {
+    const id = sessionId();
+    if (id === shownFor) return false;
+    shownFor = id;
+    questions = null;
+    error = "";
+    lastShown = "";
+    return true;
+  }
+
+  // Puts the section after Context, or redraws it when what it shows
+  // changed. A re-render of the rail that drops it puts it back on the next
+  // mutation.
   function render() {
+    const moved = follow();
     const existing = document.querySelector(`[${MARK}]`);
-    if (!sessionId()) {
+    if (!shownFor) {
       existing?.remove();
       return;
     }
+    if (moved) poll();
     const t = template();
     if (!t || !t.anchor) return;
-    const key = JSON.stringify([questions, isCollapsed]);
+    const key = JSON.stringify([shownFor, questions, error, isCollapsed]);
     if (existing && existing.isConnected && key === lastShown) return;
     lastShown = key;
     const card = build(t);
-    card.setAttribute(MARK, "");
     if (existing) existing.replaceWith(card);
     else t.anchor.after(card);
+  }
+
+  // The extension was reloaded or removed: this copy can no longer reach it,
+  // and the new one is not injected into open tabs, so step aside.
+  function retire() {
+    clearInterval(timer);
+    observer?.disconnect();
+    document.querySelector(`[${MARK}]`)?.remove();
   }
 
   function poll() {
     const id = sessionId();
     if (!id || isPolling || document.hidden) return;
+    if (!chrome.runtime?.id) {
+      retire();
+      return;
+    }
     isPolling = true;
-    chrome.runtime.sendMessage({ type: "questions", bridgeSessionId: id }, (reply) => {
+    try {
+      chrome.runtime.sendMessage({ type: "questions", bridgeSessionId: id }, (reply) => {
+        isPolling = false;
+        if (id !== sessionId()) return;
+        if (chrome.runtime.lastError || !reply || reply.error) {
+          // Keep the last list; say why it is not updating.
+          error = `Not updating: ${chrome.runtime.lastError?.message || reply?.error || "no reply"}`;
+        } else {
+          error = "";
+          // A session missing from one reply (its file mid-write) keeps its list.
+          if (Array.isArray(reply.questions) || questions === null) {
+            questions = Array.isArray(reply.questions) ? reply.questions : null;
+          }
+        }
+        render();
+      });
+    } catch {
       isPolling = false;
-      if (chrome.runtime.lastError || !reply || id !== sessionId()) return;
-      questions = Array.isArray(reply.questions) ? reply.questions : null;
-      render();
-    });
+      retire();
+    }
   }
 
   let scheduled = 0;
-  new MutationObserver(() => {
+  observer = new MutationObserver(() => {
     if (scheduled) return;
     scheduled = setTimeout(() => {
       scheduled = 0;
       if (!document.querySelector(`[${MARK}]`)) lastShown = "";
       render();
     }, 200);
-  }).observe(document.body, { childList: true, subtree: true });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 
-  let lastPath = location.pathname;
-  setInterval(() => {
-    if (location.pathname !== lastPath) {
-      lastPath = location.pathname;
-      questions = null;
-      lastShown = "";
-    }
+  timer = setInterval(() => {
+    follow();
     poll();
   }, POLL_MS);
   document.addEventListener("visibilitychange", poll);
