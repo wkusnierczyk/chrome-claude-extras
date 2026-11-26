@@ -174,11 +174,12 @@ function render(sessions) {
 // Whether the session may be cleared, by the status line's rule (as rail.js).
 function clearLine(session) {
   const state = session.clear;
-  const tokens = session.context?.tokens ?? null;
+  // Unknown counts as 0, as the status line counts it.
+  const tokens = session.context?.tokens ?? 0;
   let verdict = null;
   if (state?.state === "busy") verdict = ["Don't clear yet", "warn", state.why];
-  else if (state?.state === "done") verdict = [tokens !== null && tokens < CLEAR_AT ? "Clear when you like" : "Clear now", "ok", state.why];
-  else if (tokens !== null && tokens >= BOUNDARY_AT) verdict = ["Clear at the next boundary", "warn", "the context is large"];
+  else if (state?.state === "done") verdict = [tokens < CLEAR_AT ? "Clear when you like" : "Clear now", "ok", state.why];
+  else if (tokens >= BOUNDARY_AT) verdict = ["Clear at the next boundary", "warn", "the context is large"];
   if (!verdict) return null;
   const [label, tone, why] = verdict;
   return el(
@@ -186,7 +187,9 @@ function clearLine(session) {
     { className: "clear" },
     el("span", { className: tone, textContent: label }),
     why ? `: ${why}` : "",
-    typeof tokens === "number" ? el("span", { className: "dim", textContent: ` · context ${Math.round(tokens / 1000)}k` }) : null,
+    typeof session.context?.tokens === "number"
+      ? el("span", { className: "dim", textContent: ` · context ${Math.round(session.context.tokens / 1000)}k` })
+      : null,
   );
 }
 

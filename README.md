@@ -25,13 +25,14 @@ Two sections in a Claude Code session's right-hand sidebar on claude.ai/code, af
 
 | Shows | When |
 |---|---|
-| **Don't clear yet** | The session said `busy`; its reason follows, and when it was set if over 6 hours ago. |
+| **Don't clear yet** | The session said `busy`; its reason follows. |
 | **Clear now** | The session said `done`, and the context holds 60k tokens or more. |
 | **Clear when you like** | The session said `done`, with a smaller context. |
 | **Clear at the next boundary** | Nothing recorded, and the context holds 300k tokens or more. |
 | **Nothing recorded** | Neither. |
+| **Session ended** | The session was cleared or quit, and the new one has not written yet. |
 
-The heading carries the verdict, so it reads folded too; the body adds the reason and the context's size.
+The heading carries the verdict, so it reads folded too; the body adds the reason, the context's size and when the state was set. An unknown context size counts as 0, as the status line counts it. The size is written after each reply's question update, so it can trail the status line by a few seconds; the status line's prompt-cache hint ("cold HH:MM") is not shown.
 
 **Questions** lists the questions a Claude Code session has asked you, by state: **Open**, **Progressing** (answered in part, or waiting on a follow-up only you can settle, with what is still missing) and **Answered** (folded, with the answer). Numbers stay stable across the session (`Q1`, `Q2`, …), in the same style as `/decide` (the mod numbers its own list, so the two can differ). A mock-up link opens in a new tab.
 

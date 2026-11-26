@@ -50,16 +50,18 @@
   const MARK = "data-cce-rail";
   const ORDER = ["clear", "questions"];
   const HEADINGS = { open: "Open", progressing: "Progressing", answered: "Answered" };
-  // The status line's thresholds (~/.claude/statusline.sh), in tokens, and
-  // the age past which a "don't clear" says when it was set.
+  // Replies in a row without the session (its file mid-write) that keep
+  // what was shown before it is dropped.
+  const KEEP_MISSES = 2;
+  // The status line's thresholds (~/.claude/statusline.sh), in tokens.
   const CLEAR_AT = 60000;
   const BOUNDARY_AT = 300000;
-  const STALE_REASON_S = 6 * 3600;
 
   // What is shown, and for which session: nothing is drawn on another
   // session's page, even for the moment before that page's first reply.
   let shownFor = null;
   let session = null; // the host's record of the session, null until found
+  let misses = 0; // replies in a row without the session
   let error = "";
   const lastShown = {};
   const isCollapsed = { clear: false, questions: false };
@@ -201,21 +203,20 @@
   // ---------- Clear ----------
 
   // The status line's rule: the session's own word (busy or done) first,
-  // then the context's size.
+  // then the context's size, counted 0 when unknown as the status line does.
   function clearVerdict() {
+    if (session?.isEnded) return { label: "Session ended", tone: "cce-dim", why: "cleared or quit" };
     const state = session?.clear;
-    const tokens = session?.context?.tokens ?? null;
-    const now = Date.now() / 1000;
+    const tokens = session?.context?.tokens ?? 0;
     if (state?.state === "busy") {
-      const stale = typeof state.at === "number" && now - state.at > STALE_REASON_S;
-      return { label: "Don't clear yet", tone: "cce-warn", why: state.why, since: stale ? state.at : null };
+      return { label: "Don't clear yet", tone: "cce-warn", why: state.why };
     }
     if (state?.state === "done") {
-      return tokens !== null && tokens < CLEAR_AT
+      return tokens < CLEAR_AT
         ? { label: "Clear when you like", tone: "cce-ok", why: state.why }
         : { label: "Clear now", tone: "cce-ok", why: state.why };
     }
-    if (tokens !== null && tokens >= BOUNDARY_AT) {
+    if (tokens >= BOUNDARY_AT) {
       return { label: "Clear at the next boundary", tone: "cce-warn", why: "the context is large" };
     }
     return { label: "Nothing recorded", tone: "cce-dim", why: "" };
@@ -227,11 +228,12 @@
     }
     const verdict = clearVerdict();
     const tokens = session.context?.tokens;
-    const facts = [
-      typeof tokens === "number" ? `context ${Math.round(tokens / 1000)}k` : null,
-      verdict.since ? `set ${ago(verdict.since)}` : null,
-      session.clear?.at ? `updated ${ago(session.clear.at)}` : null,
-    ].filter(Boolean);
+    const facts = session.isEnded
+      ? []
+      : [
+          typeof tokens === "number" ? `context ${Math.round(tokens / 1000)}k` : null,
+          typeof session.clear?.at === "number" ? `set ${ago(session.clear.at)}` : null,
+        ].filter(Boolean);
     const body = el(
       "div",
       { className: `${t.listBody} cce-body` },
@@ -275,7 +277,7 @@
   }
 
   function buildQuestions(t) {
-    const questions = Array.isArray(session?.questions) ? session.questions : null;
+    const questions = Array.isArray(session?.questions) && !session.isEnded ? session.questions : null;
     const list = questions || [];
     const byState = (state) => list.filter((q) => q.state === state);
     const pending = byState("open").length + byState("progressing").length;
@@ -326,6 +328,7 @@
     if (id === shownFor) return false;
     shownFor = id;
     session = null;
+    misses = 0;
     error = "";
     for (const name of ORDER) delete lastShown[name];
     return true;
@@ -385,8 +388,10 @@
           error = `Not updating: ${chrome.runtime.lastError?.message || reply?.error || "no reply"}`;
         } else {
           error = "";
-          // A session missing from one reply (its file mid-write) keeps what it showed.
-          if (reply.session || session === null) session = reply.session || null;
+          // A session missing from a reply or two (its file mid-write) keeps
+          // what it showed; longer, it is gone.
+          misses = reply.session ? 0 : misses + 1;
+          if (reply.session || misses > KEEP_MISSES) session = reply.session || null;
         }
         render();
       });
