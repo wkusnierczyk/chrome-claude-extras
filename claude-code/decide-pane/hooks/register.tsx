@@ -102,7 +102,17 @@ function toQuestions(raw: unknown[]): Question[] {
 
 // Where the Chrome extension's native host reads each session's list: one
 // file per session, so several sessions never write the same file.
-async function publish($: EngineInterface, isEnded: boolean, endedId?: string): Promise<void> {
+// Writes go one after another, in the order asked, so a session's end mark
+// is never overwritten by a refresh that was already writing.
+let writes: Promise<void> = Promise.resolve()
+
+function publish($: EngineInterface, isEnded: boolean, endedId?: string): Promise<void> {
+  writes = writes.then(() => write($, isEnded, endedId))
+
+  return writes
+}
+
+async function write($: EngineInterface, isEnded: boolean, endedId?: string): Promise<void> {
   try {
     const home = await $.env.get('HOME')
     if (home === undefined || home === '') return
@@ -185,10 +195,12 @@ export const register: Register = on => {
   })
 
   on('session.end', async ($, e, next) => {
+    // First, before anything awaits: a refresh begun before the end must not
+    // publish after the end mark.
+    generation += 1
     await publish($, true, e.sessionId)
     if (e.reason === 'clear') {
       // The process goes on as a new session, with no session.start.
-      generation += 1
       lastAnswer = ''
       isQueued = false
       await update($, questions, () => [])
