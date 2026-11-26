@@ -17,17 +17,20 @@ Four buttons under every reply, next to the native Copy button. Works in regular
 | **✎ .pdf** | Types and sends a prompt asking Claude to write that reply up as a PDF document: a title, sections and no chat asides, with the reply's content kept. Claude produces the `.pdf` in the chat. |
 | **⚔ Critique** | Types and sends a prompt asking Claude to critically review that reply: evidence for and against its claims, and whether opinions on it converge or are polarised. |
 
-### Questions panel
+### Questions
 
-A Chrome side panel listing the questions a Claude Code session has asked you, by state: **Open**, **Progressing** (answered in part, or waiting on a follow-up only you can settle, with what is still missing) and **Answered** (folded, with the answer). Numbers stay stable across the session (`Q1`, `Q2`, …), in the same style as `/decide` (the mod numbers its own list, so the two can differ). Click a question to copy `Q3: ` and paste it into the prompt to answer by number; a mock-up link opens in a new tab.
+The questions a Claude Code session has asked you, by state, in a **Questions** section of the session's right-hand sidebar on claude.ai/code (between *Context* and *Outputs*), and in a Chrome side panel: **Open**, **Progressing** (answered in part, or waiting on a follow-up only you can settle, with what is still missing) and **Answered** (folded, with the answer). Numbers stay stable across the session (`Q1`, `Q2`, …), in the same style as `/decide` (the mod numbers its own list, so the two can differ). A mock-up link opens in a new tab.
 
-Click the extension's toolbar button to open the panel. It shows the session updated most recently, refreshes every 3 seconds, and its menu switches to any other running session. It is meant for sessions started in a terminal and opened on claude.ai/code over Remote Control: a Claude Code mod can draw a pane in the terminal, but the claude.ai page does not draw mod panes.
+- **In the sidebar.** The section shows the session the page shows, found by its Remote Control id (the `session_…` in the address), and refreshes every 3 seconds. Click its heading to fold it; click a question to type `Q3: ` into the message box, to answer by number. Its look is copied from the sidebar's own sections as the page draws them.
+- **In the side panel.** Click the extension's toolbar button. It shows the session updated most recently, and its menu switches to any other running session; click a question to copy `Q3: `.
+
+It is meant for sessions started in a terminal and opened on claude.ai/code over Remote Control: a Claude Code mod can draw a pane in the terminal, but the claude.ai page does not draw mod panes.
 
 Three parts make it work:
 
-- **The `decide-pane` mod** (`claude-code/decide-pane/`). After each reply it asks a fork of the session which questions it has asked you and their state, draws them in a terminal pane (`/questions` opens it), and writes them to `~/.claude/decide-pane/sessions/<session id>.json` with the session's directory and repository. The fork reuses the session's prompt cache, but each one is a model request billed like any other.
+- **The `decide-pane` mod** (`claude-code/decide-pane/`). After each reply it asks a fork of the session which questions it has asked you and their state, draws them in a terminal pane (`/questions` opens it), and writes them to `~/.claude/decide-pane/sessions/<session id>.json` with the session's directory, repository and Remote Control id. The fork reuses the session's prompt cache, but each one is a model request billed like any other.
 - **A native messaging host** (`host/claude_extras_host.py`, Python 3 standard library). Chrome cannot read local files, so the panel asks this small program, which Chrome starts on demand, for those files. It skips sessions that ended, and deletes their files after an hour; a session not updated for a week is taken as gone and its file deleted too.
-- **The side panel** (`extension/sidepanel.*`).
+- **The sidebar section and the side panel** (`extension/questions.js`, `extension/sidepanel.*`). Content scripts cannot reach a native host, so the section asks the background worker (`background.js`), which asks the host.
 
 ## Install
 
@@ -70,7 +73,7 @@ If the Copy button can't be found or doesn't respond within 1.5 seconds, the ext
 
 The reply buttons run only on `https://claude.ai/*`. The extension makes no network requests and stores nothing. Downloads are created locally from a `Blob`.
 
-The Questions panel adds two permissions: `sidePanel`, to show the panel, and `nativeMessaging`, to ask the native host for the questions files. The host only reads `~/.claude/decide-pane/sessions/` and answers this extension alone. A small background worker sets the toolbar button to open the panel. The mod writes only to that folder; its forks go to the model the session already uses, on your own credentials.
+The Questions feature adds two permissions: `sidePanel`, to show the panel, and `nativeMessaging`, to ask the native host for the questions files. The host only reads `~/.claude/decide-pane/sessions/` (and deletes ended sessions' files there) and answers this extension alone. A small background worker sets the toolbar button to open the panel and passes the host's answer to the sidebar section; nothing leaves your machine. The mod writes only to that folder; its forks go to the model the session already uses, on your own credentials.
 
 ## When claude.ai changes
 
@@ -85,6 +88,8 @@ claude.ai's markup is not a public API, so an update to the site can break the b
 | `composer` | The message input |
 | `sendButton` | The Send button |
 
+The Questions section has a `SEL` object of its own at the top of `extension/questions.js`: the sidebar's sections, their cards, header row and button, list body and rows, and the message box.
+
 If the native Copy button stops being recognised, buttons still appear in a fallback row under each finished reply in regular chats, using the HTML converter.
 
 ## Files
@@ -96,7 +101,8 @@ extension/
   html2md.js      Fallback HTML to markdown converter
   content.js      Button injection and actions
   styles.css      Button and toast styling
-  background.js   Toolbar button opens the side panel
+  questions.js    Questions section in a Code session's sidebar
+  background.js   Toolbar button opens the side panel; relays the host to questions.js
   sidepanel.html  Questions panel
   sidepanel.js    Polls the native host, draws the questions
   sidepanel.css   Panel styling, light and dark

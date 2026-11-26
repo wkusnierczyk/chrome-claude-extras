@@ -109,8 +109,12 @@ async function publish($: EngineInterface, isEnded: boolean, endedId?: string): 
     const sessionId = endedId ?? (await $.session.id())
     const repo = await $.session.repo()
     const status = await read($, refresh)
+    // The Remote Control id, as claude.ai/code's address has it: how the
+    // extension finds the session a page shows. Absent without Remote Control.
+    const bridge = await $.env.get('CLAUDE_CODE_BRIDGE_SESSION_ID')
     const doc = {
       sessionId,
+      bridgeSessionId: bridge === undefined || bridge === '' ? null : bridge,
       root: await $.session.root(),
       repo: repo?.remote ?? null,
       updatedAt: await $.clock.now(),

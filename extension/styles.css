@@ -65,3 +65,60 @@
     color: #1f1e1d;
   }
 }
+
+/* Questions section in a Code session's right-hand rail (questions.js). The
+   rest of its look comes from the rail's own classes, copied at run time. */
+.cce-q {
+  align-items: flex-start !important;
+  height: auto !important;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.cce-q-n {
+  flex-shrink: 0;
+  min-width: 2.2em;
+  font-weight: 600;
+}
+
+.cce-q-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cce-q a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.cce-head {
+  margin: 8px 4px 2px;
+  font-size: 0.85em;
+  font-weight: 600;
+  opacity: 0.7;
+  cursor: default;
+}
+
+details > summary.cce-head {
+  cursor: pointer;
+}
+
+.cce-dim {
+  opacity: 0.6;
+}
+
+.cce-warn {
+  color: #a8660a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cce-warn {
+    color: #e0a94a;
+  }
+}
+
+.cce-note {
+  margin: 4px;
+}
