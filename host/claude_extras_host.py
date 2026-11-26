@@ -16,8 +16,10 @@ import time
 from pathlib import Path
 
 SESSIONS = Path.home() / ".claude" / "decide-pane" / "sessions"
-# A session not updated for this long is assumed gone (a crash leaves no end mark).
+# A session not updated for this long is assumed gone (a crash leaves no end
+# mark); its file is deleted, as is an ended session's after a short grace.
 STALE_SECONDS = 7 * 24 * 3600
+ENDED_SECONDS = 3600
 # Chrome refuses a message from the host over 1 MB.
 MAX_REPLY = 1024 * 1024 - 1024
 
@@ -46,11 +48,19 @@ def list_sessions():
         try:
             modified = path.stat().st_mtime
             if now - modified > STALE_SECONDS:
+                path.unlink(missing_ok=True)
                 continue
             doc = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if not isinstance(doc, dict) or doc.get("isEnded"):
+        if not isinstance(doc, dict) or not isinstance(doc.get("sessionId"), str):
+            continue
+        if doc.get("isEnded"):
+            if now - modified > ENDED_SECONDS:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass
             continue
         doc["modifiedAt"] = modified
         sessions.append(doc)

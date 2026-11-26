@@ -16,6 +16,9 @@ const refresh = atom(
   { shape: 'refresh-1' },
 )
 const showAnswered = atom({ plugin: 'decide-pane', key: 'showAnswered' } as const, false)
+// Set once the pane was opened unasked, so a reload does not reopen a pane
+// the person closed.
+const isPaneShown = atom({ plugin: 'decide-pane', key: 'isPaneShown' } as const, false)
 
 const STATES: QuestionState[] = ['open', 'progressing', 'answered']
 const HEADINGS: Record<QuestionState, string> = {
@@ -55,39 +58,55 @@ function ask(previous: Question[], answer: string): string {
   ].join('\n')
 }
 
+// The reply's JSON array: tried from each `[` in turn, since the fork may
+// lead with prose that holds one.
 function parse(text: string): Question[] | undefined {
-  const start = text.indexOf('[')
   const end = text.lastIndexOf(']')
-  if (start < 0 || end < start) return undefined
-  try {
-    const raw: unknown = JSON.parse(text.slice(start, end + 1))
-    if (!Array.isArray(raw)) return undefined
+  for (let start = text.indexOf('['); start >= 0 && start < end; start = text.indexOf('[', start + 1)) {
+    let raw: unknown
+    try {
+      raw = JSON.parse(text.slice(start, end + 1))
+    } catch {
+      continue
+    }
+    if (!Array.isArray(raw)) continue
 
-    return raw
-      .filter(
-        (q): q is Record<string, unknown> =>
-          typeof q === 'object' && q !== null && typeof q.question === 'string',
-      )
-      .map((q, i) => ({
-        n: typeof q.n === 'number' ? q.n : i + 1,
-        issue: typeof q.issue === 'string' ? q.issue : '',
-        question: String(q.question),
-        state: STATES.includes(q.state as QuestionState) ? (q.state as QuestionState) : 'open',
-        note: typeof q.note === 'string' ? q.note : '',
-        link: typeof q.link === 'string' ? q.link : '',
-      }))
-  } catch {
-    return undefined
+    return toQuestions(raw)
   }
+
+  return undefined
+}
+
+function toQuestions(raw: unknown[]): Question[] {
+  const seen = new Set<number>()
+  const list: Question[] = []
+  for (const q of raw) {
+    if (typeof q !== 'object' || q === null) continue
+    const item = q as Record<string, unknown>
+    if (typeof item.question !== 'string') continue
+    let n = typeof item.n === 'number' && Number.isInteger(item.n) && item.n > 0 ? item.n : 0
+    if (n === 0 || seen.has(n)) n = Math.max(0, ...seen) + 1
+    seen.add(n)
+    list.push({
+      n,
+      issue: typeof item.issue === 'string' ? item.issue : '',
+      question: item.question,
+      state: STATES.includes(item.state as QuestionState) ? (item.state as QuestionState) : 'open',
+      note: typeof item.note === 'string' ? item.note : '',
+      link: typeof item.link === 'string' ? item.link : '',
+    })
+  }
+
+  return list
 }
 
 // Where the Chrome extension's native host reads each session's list: one
 // file per session, so several sessions never write the same file.
-async function publish($: EngineInterface, isEnded: boolean): Promise<void> {
+async function publish($: EngineInterface, isEnded: boolean, endedId?: string): Promise<void> {
   try {
     const home = await $.env.get('HOME')
     if (home === undefined || home === '') return
-    const sessionId = await $.session.id()
+    const sessionId = endedId ?? (await $.session.id())
     const repo = await $.session.repo()
     const status = await read($, refresh)
     const doc = {
@@ -110,6 +129,8 @@ async function publish($: EngineInterface, isEnded: boolean): Promise<void> {
 let lastAnswer = ''
 let isRunning = false
 let isQueued = false
+// Bumped by /clear: a run that began before it drops its result.
+let generation = 0
 
 async function run($: EngineInterface): Promise<void> {
   if (isRunning) {
@@ -117,12 +138,15 @@ async function run($: EngineInterface): Promise<void> {
     return
   }
   isRunning = true
+  const started = generation
   await update($, refresh, r => ({ ...r, isRunning: true }))
   let error = ''
   try {
     const previous = await read($, questions)
     const reply = await $.model.fork({ prompt: ask(previous, lastAnswer) })
-    if (!reply.isAnswered) {
+    if (started !== generation) {
+      error = ''
+    } else if (!reply.isAnswered) {
       error = reply.reason === 'nothing-to-fork' ? '' : `not updated: ${reply.reason}`
     } else {
       const list = parse(reply.text)
@@ -133,7 +157,7 @@ async function run($: EngineInterface): Promise<void> {
     isRunning = false
     const at = await $.clock.now()
     await update($, refresh, () => ({ isRunning: false, error, at }))
-    await publish($, false)
+    if (started === generation) await publish($, false)
   }
   if (isQueued) {
     isQueued = false
@@ -148,13 +172,24 @@ export const register: Register = on => {
       description: 'Show the questions this session has asked you, in a pane',
     })
     await update($, refresh, r => ({ ...r, isRunning: false }))
-    void $.ui.open({ id: PANE, title: TITLE })
+    if (!(await read($, isPaneShown))) {
+      await update($, isPaneShown, () => true)
+      void $.ui.open({ id: PANE, title: TITLE })
+    }
 
     return next(e)
   })
 
   on('session.end', async ($, e, next) => {
-    await publish($, true)
+    await publish($, true, e.sessionId)
+    if (e.reason === 'clear') {
+      // The process goes on as a new session, with no session.start.
+      generation += 1
+      lastAnswer = ''
+      isQueued = false
+      await update($, questions, () => [])
+      await update($, refresh, () => ({ isRunning: false, error: '', at: 0 }))
+    }
 
     return next(e)
   })

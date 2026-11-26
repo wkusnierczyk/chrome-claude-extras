@@ -14,7 +14,9 @@ const toast = document.getElementById("toast");
 // Follow the latest-updated session until the person picks one.
 let pickedId = null;
 let isAnsweredOpen = false;
-let lastRendered = "";
+let lastOptions = "";
+let lastList = "";
+let isPolling = false;
 
 function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
@@ -64,11 +66,21 @@ function safeLink(url) {
   }
 }
 
+async function copyNumber(q) {
+  try {
+    await navigator.clipboard.writeText(`Q${q.n}: `);
+    showToast(`Copied "Q${q.n}: " — paste it into the prompt`);
+  } catch {
+    showToast("Could not copy to the clipboard");
+  }
+}
+
+// A div acting as a button, since a button may not hold the mock-up link.
 function questionRow(q) {
   const link = q.link ? safeLink(q.link) : null;
   const row = el(
-    "button",
-    { className: "q", type: "button", title: `Copy "Q${q.n}: " to answer it` },
+    "div",
+    { className: "q", role: "button", tabIndex: 0, title: `Copy "Q${q.n}: " to answer it` },
     el("span", { className: "n", textContent: `Q${q.n}` }),
     q.issue ? el("span", { className: "issue", textContent: `${q.issue} ` }) : null,
     q.question,
@@ -81,50 +93,59 @@ function questionRow(q) {
     link ? " " : null,
     link ? el("a", { href: link, target: "_blank", rel: "noopener", textContent: "mock-up" }) : null,
   );
-  row.addEventListener("click", async (event) => {
-    if (event.target.closest("a")) return;
-    try {
-      await navigator.clipboard.writeText(`Q${q.n}: `);
-      showToast(`Copied "Q${q.n}: " — paste it into the prompt`);
-    } catch {
-      showToast("Could not copy to the clipboard");
-    }
+  row.addEventListener("click", (event) => {
+    if (!event.target.closest("a")) copyNumber(q);
+  });
+  row.addEventListener("keydown", (event) => {
+    if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    copyNumber(q);
   });
   return row;
 }
 
-function render(sessions) {
-  const key = JSON.stringify([sessions, pickedId]);
-  if (key === lastRendered) {
-    if (sessions.length > 0) updated.textContent = ago(current(sessions).modifiedAt);
-    return;
-  }
-  lastRendered = key;
+function clearPanel() {
+  lastOptions = "";
+  lastList = "";
+  sessionSelect.replaceChildren();
+  sessionSelect.disabled = true;
+  updated.textContent = "";
+  list.replaceChildren();
+}
 
+// Each part is rebuilt only when what it shows changed, so a poll leaves an
+// open menu, the focus and the hover alone.
+function render(sessions) {
   if (sessions.length === 0) {
-    sessionSelect.replaceChildren();
-    sessionSelect.disabled = true;
-    updated.textContent = "";
-    list.replaceChildren();
+    clearPanel();
     showMessage("No Claude Code session with the decide-pane mod has written its questions yet.");
     return;
   }
 
   const session = current(sessions);
-  sessionSelect.disabled = false;
-  sessionSelect.replaceChildren(
-    ...sessions.map((s) =>
-      el("option", {
-        value: s.sessionId,
-        selected: s.sessionId === session.sessionId,
-        textContent: `${sessionName(s)} · ${s.sessionId.slice(0, 8)}`,
-      }),
-    ),
-  );
   updated.textContent = ago(session.modifiedAt);
-  showMessage(session.error || "", Boolean(session.error));
+
+  const options = JSON.stringify([sessions.map((s) => [s.sessionId, sessionName(s)]), session.sessionId]);
+  if (options !== lastOptions && document.activeElement !== sessionSelect) {
+    lastOptions = options;
+    sessionSelect.disabled = false;
+    sessionSelect.replaceChildren(
+      ...sessions.map((s) =>
+        el("option", {
+          value: s.sessionId,
+          selected: s.sessionId === session.sessionId,
+          textContent: `${sessionName(s)} · ${s.sessionId.slice(0, 8)}`,
+        }),
+      ),
+    );
+  }
 
   const questions = Array.isArray(session.questions) ? session.questions : [];
+  const shown = JSON.stringify([session.sessionId, session.error || "", questions]);
+  if (shown === lastList) return;
+  lastList = shown;
+  showMessage(session.error || "", Boolean(session.error));
+
   const byState = (state) => questions.filter((q) => q.state === state);
   const sections = [];
   for (const state of ["open", "progressing"]) {
@@ -156,14 +177,15 @@ sessionSelect.addEventListener("change", () => {
   poll();
 });
 
+// One request at a time, and none while the panel is hidden: each starts
+// the host as a new process.
 function poll() {
+  if (isPolling || document.hidden) return;
+  isPolling = true;
   chrome.runtime.sendNativeMessage(HOST, { type: "list" }, (reply) => {
+    isPolling = false;
     if (chrome.runtime.lastError || !reply) {
-      lastRendered = "";
-      list.replaceChildren();
-      sessionSelect.replaceChildren();
-      sessionSelect.disabled = true;
-      updated.textContent = "";
+      clearPanel();
       showMessage(
         [
           "Cannot reach the native host. Run ",
@@ -179,9 +201,10 @@ function poll() {
       showMessage(reply.error, true);
       return;
     }
-    render(reply.sessions || []);
+    render(Array.isArray(reply.sessions) ? reply.sessions : []);
   });
 }
 
+document.addEventListener("visibilitychange", poll);
 poll();
 setInterval(poll, POLL_MS);

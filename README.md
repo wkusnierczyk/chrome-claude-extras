@@ -19,14 +19,14 @@ Four buttons under every reply, next to the native Copy button. Works in regular
 
 ### Questions panel
 
-A Chrome side panel listing the questions a Claude Code session has asked you, by state: **Open**, **Progressing** (answered in part, or waiting on a follow-up only you can settle, with what is still missing) and **Answered** (folded, with the answer). Numbers stay stable across the session (`Q1`, `Q2`, …), as `/decide` numbers them. Click a question to copy `Q3: ` and paste it into the prompt to answer by number; a mock-up link opens in a new tab.
+A Chrome side panel listing the questions a Claude Code session has asked you, by state: **Open**, **Progressing** (answered in part, or waiting on a follow-up only you can settle, with what is still missing) and **Answered** (folded, with the answer). Numbers stay stable across the session (`Q1`, `Q2`, …), in the same style as `/decide` (the mod numbers its own list, so the two can differ). Click a question to copy `Q3: ` and paste it into the prompt to answer by number; a mock-up link opens in a new tab.
 
 Click the extension's toolbar button to open the panel. It shows the session updated most recently, refreshes every 3 seconds, and its menu switches to any other running session. It is meant for sessions started in a terminal and opened on claude.ai/code over Remote Control: a Claude Code mod can draw a pane in the terminal, but the claude.ai page does not draw mod panes.
 
 Three parts make it work:
 
 - **The `decide-pane` mod** (`claude-code/decide-pane/`). After each reply it asks a fork of the session which questions it has asked you and their state, draws them in a terminal pane (`/questions` opens it), and writes them to `~/.claude/decide-pane/sessions/<session id>.json` with the session's directory and repository. The fork reuses the session's prompt cache, but each one is a model request billed like any other.
-- **A native messaging host** (`host/claude_extras_host.py`, Python 3 standard library). Chrome cannot read local files, so the panel asks this small program, which Chrome starts on demand, for those files. It skips sessions that ended or have not been updated for a week.
+- **A native messaging host** (`host/claude_extras_host.py`, Python 3 standard library). Chrome cannot read local files, so the panel asks this small program, which Chrome starts on demand, for those files. It skips sessions that ended, and deletes their files after an hour; a session not updated for a week is taken as gone and its file deleted too.
 - **The side panel** (`extension/sidepanel.*`).
 
 ## Install
@@ -44,7 +44,7 @@ For the Questions panel, also:
    host/install.sh
    ```
 
-   It registers the host for Chrome and for Chromium, Brave, Edge or Arc where installed. Run it again after moving the repository; `host/install.sh --uninstall` removes it.
+   It registers the host for Chrome and for Chromium, Brave, Edge or Arc where installed. On Linux it does not cover Chrome Beta, Dev or Canary, and a snap or flatpak browser usually cannot start native hosts at all. Run it again after moving the repository; `host/install.sh --uninstall` removes it.
 
 6. Install the mod, at the prompt of a Claude Code session in a terminal:
 
@@ -54,7 +54,7 @@ For the Questions panel, also:
 
    Answer `y` to add the marketplace, then pick the user scope so it runs in every session.
 
-The extension's ID is fixed by the `key` in `manifest.json` (`oadhipdbgcnjhfcfiblhihcjdhlcilic`), which the host's registration names as the one extension allowed to call it.
+The extension's ID is fixed by the `key` in `manifest.json` (`oadhipdbgcnjhfcfiblhihcjdhlcilic`), which the host's registration names as the one extension allowed to call it. A Chrome Web Store build would get an ID of its own (the store refuses `key`), which `allowed_origins` in `host/install.sh` would then have to list.
 
 It works in any Chromium browser that supports Manifest V3 with `world: "MAIN"` content scripts (Chrome 111+, Edge, Brave, Arc).
 

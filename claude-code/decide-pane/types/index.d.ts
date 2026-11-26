@@ -17,6 +17,7 @@ declare module 'claude-code' {
       questions: Shaped<Question[]>
       refresh: Shaped<Refresh>
       showAnswered: boolean
+      isPaneShown: boolean
     }
   }
 }
