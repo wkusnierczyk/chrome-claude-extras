@@ -1,0 +1,6 @@
+{
+  "name": "decide-pane",
+  "version": "0.1.0",
+  "description": "A pane beside the chat listing the questions this session has asked you, by state",
+  "types": "./types/index.d.ts"
+}

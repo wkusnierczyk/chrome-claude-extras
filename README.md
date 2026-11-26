@@ -1,6 +1,6 @@
 # chrome-claude-extras
 
-**Extras for Claude** is a Chrome extension with small quality-of-life additions to [claude.ai](https://claude.ai).
+**Extras for Claude** is a Chrome extension with small quality-of-life additions to [claude.ai](https://claude.ai), and a Claude Code mod that goes with it.
 
 Not affiliated with or endorsed by Anthropic. "Claude" is a trademark of Anthropic.
 
@@ -17,12 +17,44 @@ Four buttons under every reply, next to the native Copy button. Works in regular
 | **✎ .pdf** | Types and sends a prompt asking Claude to write that reply up as a PDF document: a title, sections and no chat asides, with the reply's content kept. Claude produces the `.pdf` in the chat. |
 | **⚔ Critique** | Types and sends a prompt asking Claude to critically review that reply: evidence for and against its claims, and whether opinions on it converge or are polarised. |
 
+### Questions panel
+
+A Chrome side panel listing the questions a Claude Code session has asked you, by state: **Open**, **Progressing** (answered in part, or waiting on a follow-up only you can settle, with what is still missing) and **Answered** (folded, with the answer). Numbers stay stable across the session (`Q1`, `Q2`, …), as `/decide` numbers them. Click a question to copy `Q3: ` and paste it into the prompt to answer by number; a mock-up link opens in a new tab.
+
+Click the extension's toolbar button to open the panel. It shows the session updated most recently, refreshes every 3 seconds, and its menu switches to any other running session. It is meant for sessions started in a terminal and opened on claude.ai/code over Remote Control: a Claude Code mod can draw a pane in the terminal, but the claude.ai page does not draw mod panes.
+
+Three parts make it work:
+
+- **The `decide-pane` mod** (`claude-code/decide-pane/`). After each reply it asks a fork of the session which questions it has asked you and their state, draws them in a terminal pane (`/questions` opens it), and writes them to `~/.claude/decide-pane/sessions/<session id>.json` with the session's directory and repository. The fork reuses the session's prompt cache, but each one is a model request billed like any other.
+- **A native messaging host** (`host/claude_extras_host.py`, Python 3 standard library). Chrome cannot read local files, so the panel asks this small program, which Chrome starts on demand, for those files. It skips sessions that ended or have not been updated for a week.
+- **The side panel** (`extension/sidepanel.*`).
+
 ## Install
 
 1. Download or clone this repository.
 2. Open `chrome://extensions` and switch on **Developer mode** (top right).
 3. Click **Load unpacked** and select the `extension` folder.
 4. Reload any open claude.ai tabs.
+
+For the Questions panel, also:
+
+5. Register the native host (macOS and Linux; needs `python3`):
+
+   ```sh
+   host/install.sh
+   ```
+
+   It registers the host for Chrome and for Chromium, Brave, Edge or Arc where installed. Run it again after moving the repository; `host/install.sh --uninstall` removes it.
+
+6. Install the mod, at the prompt of a Claude Code session in a terminal:
+
+   ```
+   /plugin install decide-pane --marketplace wkusnierczyk/chrome-claude-extras
+   ```
+
+   Answer `y` to add the marketplace, then pick the user scope so it runs in every session.
+
+The extension's ID is fixed by the `key` in `manifest.json` (`oadhipdbgcnjhfcfiblhihcjdhlcilic`), which the host's registration names as the one extension allowed to call it.
 
 It works in any Chromium browser that supports Manifest V3 with `world: "MAIN"` content scripts (Chrome 111+, Edge, Brave, Arc).
 
@@ -36,7 +68,9 @@ If the Copy button can't be found or doesn't respond within 1.5 seconds, the ext
 
 ## Privacy
 
-The extension requests no permissions beyond running on `https://claude.ai/*`. It makes no network requests, stores nothing, and has no background worker. Downloads are created locally from a `Blob`.
+The reply buttons run only on `https://claude.ai/*`. The extension makes no network requests and stores nothing. Downloads are created locally from a `Blob`.
+
+The Questions panel adds two permissions: `sidePanel`, to show the panel, and `nativeMessaging`, to ask the native host for the questions files. The host only reads `~/.claude/decide-pane/sessions/` and answers this extension alone. A small background worker sets the toolbar button to open the panel. The mod writes only to that folder; its forks go to the model the session already uses, on your own credentials.
 
 ## When claude.ai changes
 
@@ -57,11 +91,20 @@ If the native Copy button stops being recognised, buttons still appear in a fall
 
 ```
 extension/
-  manifest.json   Manifest V3, content scripts only
+  manifest.json   Manifest V3: content scripts, side panel, fixed key
   capture.js      MAIN-world clipboard hook
   html2md.js      Fallback HTML to markdown converter
   content.js      Button injection and actions
   styles.css      Button and toast styling
+  background.js   Toolbar button opens the side panel
+  sidepanel.html  Questions panel
+  sidepanel.js    Polls the native host, draws the questions
+  sidepanel.css   Panel styling, light and dark
+host/
+  claude_extras_host.py  Native messaging host: reads the mod's files
+  install.sh             Registers the host with the browsers
+claude-code/decide-pane/ The Claude Code mod
+.claude-plugin/marketplace.json  Makes this repository a marketplace for the mod
 ```
 
 ## License

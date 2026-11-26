@@ -1,13 +1,24 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiaXn4unDhN7BQldESIa30pmrDQj3Vs/AqOF3O/g0U/RYC91y08hce++bqLS5ngahY/ZSPSH7/lr/TG4HcQ8p9PLPgDlTyemFWJpNq2zfakoBDc3b95q9p5p+i2aSJAq6PqVw4Xjv7yZAMqjrgCSkN2tkRIwhQU7souvTceb2T12RfmT7oMBiXsxclN52+CB3kbPSYhLnMbgXfsMO9Sz3PBvFC7TH5tbA9rOrkmHwahfTqbQXu9cgdn7hGlpV8YoYeML9kJHMyU+T+CqtO7LiFxQpUKim9Xsyp+sLSFC6R1VBlreRG/RKiFKc6ydJC4gTy0PAEcQ2uC3WPWyMvZG0ywIDAQAB",
   "name": "Extras for Claude",
-  "version": "1.0.0",
-  "description": "Small additions to claude.ai. Currently: download any reply as markdown, or ask Claude for a .md or .pdf file or a critical review.",
+  "version": "1.1.0",
+  "description": "Small additions to claude.ai. Currently: download any reply as markdown, or ask Claude for a .md or .pdf file or a critical review; and a side panel with the questions your Claude Code sessions have asked you.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "sidePanel",
+    "nativeMessaging"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
   },
   "action": {
     "default_icon": {
@@ -15,7 +26,8 @@
       "32": "icons/icon32.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
-    }
+    },
+    "default_title": "Open the Questions panel"
   },
   "content_scripts": [
     {
