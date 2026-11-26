@@ -18,7 +18,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ error: chrome.runtime.lastError?.message || reply?.error || "no reply" });
       return;
     }
-    sendResponse({ questions: reply.session ? reply.session.questions : null });
+    sendResponse({ questions: reply.session ? reply.session.questions : null, isEnded: Boolean(reply.session?.isEnded) });
   });
   return true;
 });

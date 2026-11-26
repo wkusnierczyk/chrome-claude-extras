@@ -205,6 +205,9 @@ export const register: Register = on => {
       isQueued = false
       await update($, questions, () => [])
       await update($, refresh, () => ({ isRunning: false, error: '', at: 0 }))
+      // A record for the new session at once, so the page does not go on
+      // showing the cleared one until the first reply.
+      await publish($, false)
     }
 
     return next(e)

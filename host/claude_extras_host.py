@@ -39,7 +39,8 @@ def send_message(message):
     sys.stdout.buffer.flush()
 
 
-def list_sessions():
+def read_sessions():
+    """Every session's record, ended ones included, latest first."""
     now = time.time()
     sessions = []
     if not SESSIONS.is_dir():
@@ -55,17 +56,29 @@ def list_sessions():
             continue
         if not isinstance(doc, dict) or not isinstance(doc.get("sessionId"), str):
             continue
-        if doc.get("isEnded"):
-            if now - modified > ENDED_SECONDS:
-                try:
-                    path.unlink(missing_ok=True)
-                except OSError:
-                    pass
+        if doc.get("isEnded") and now - modified > ENDED_SECONDS:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
             continue
         doc["modifiedAt"] = modified
         sessions.append(doc)
     sessions.sort(key=lambda doc: doc["modifiedAt"], reverse=True)
     return sessions
+
+
+def list_sessions():
+    return [doc for doc in read_sessions() if not doc.get("isEnded")]
+
+
+def get_session(bridge_session_id):
+    """The page's session: the live record for that Remote Control id, else
+    the latest ended one (a /clear ends one session id and starts another
+    under the same Remote Control id), so the rail can say it ended."""
+    matches = [doc for doc in read_sessions() if doc.get("bridgeSessionId") == bridge_session_id]
+    live = [doc for doc in matches if not doc.get("isEnded")]
+    return (live or matches or [None])[0]
 
 
 def main():
@@ -74,9 +87,7 @@ def main():
         return
     if message.get("type") == "get":
         # One session, by its Remote Control id: the rail section's request.
-        wanted = message.get("bridgeSessionId")
-        session = next((s for s in list_sessions() if s.get("bridgeSessionId") == wanted), None)
-        send_message({"session": session})
+        send_message({"session": get_session(message.get("bridgeSessionId"))})
         return
     if message.get("type") != "list":
         send_message({"error": f"unknown request: {message.get('type')!r}"})

@@ -45,6 +45,9 @@
   ];
 
   const POLL_MS = 3000;
+  // Replies in a row without the session (its file mid-write) that keep
+  // the list shown before it is dropped.
+  const KEEP_MISSES = 2;
   const MARK = "data-cce-questions";
   const HEADINGS = { open: "Open", progressing: "Progressing", answered: "Answered" };
 
@@ -52,6 +55,7 @@
   // session's page, even for the moment before that page's first reply.
   let shownFor = null;
   let questions = null; // null until a reply has the session
+  let misses = 0; // replies in a row without the session
   let error = "";
   let lastShown = "";
   let isCollapsed = false;
@@ -243,6 +247,7 @@
     if (id === shownFor) return false;
     shownFor = id;
     questions = null;
+    misses = 0;
     error = "";
     lastShown = "";
     return true;
@@ -294,10 +299,11 @@
           error = `Not updating: ${chrome.runtime.lastError?.message || reply?.error || "no reply"}`;
         } else {
           error = "";
-          // A session missing from one reply (its file mid-write) keeps its list.
-          if (Array.isArray(reply.questions) || questions === null) {
-            questions = Array.isArray(reply.questions) ? reply.questions : null;
-          }
+          // A session missing from a reply or two (its file mid-write) keeps
+          // its list; longer, or ended (cleared or quit), it is gone.
+          const list = Array.isArray(reply.questions) && !reply.isEnded ? reply.questions : null;
+          misses = list || reply.isEnded ? 0 : misses + 1;
+          if (list || reply.isEnded || misses > KEEP_MISSES) questions = list;
         }
         render();
       });
