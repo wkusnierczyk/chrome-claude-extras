@@ -16,6 +16,9 @@ import time
 from pathlib import Path
 
 SESSIONS = Path.home() / ".claude" / "decide-pane" / "sessions"
+# Whether a session may be cleared, as ~/.claude/session-state.sh records it
+# ({"state": "busy" | "done", "why", "at"}), keyed by the same session id.
+CLEAR_STATE = Path.home() / ".claude" / "session-state"
 # A session not updated for this long is assumed gone (a crash leaves no end
 # mark); its file is deleted, as is an ended session's after a short grace.
 STALE_SECONDS = 7 * 24 * 3600
@@ -37,6 +40,15 @@ def send_message(message):
     sys.stdout.buffer.write(struct.pack("=I", len(data)))
     sys.stdout.buffer.write(data)
     sys.stdout.buffer.flush()
+
+
+def clear_state(session_id):
+    path = CLEAR_STATE / f"{Path(session_id).name}.json"
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return state if isinstance(state, dict) else None
 
 
 def list_sessions():
@@ -63,6 +75,7 @@ def list_sessions():
                     pass
             continue
         doc["modifiedAt"] = modified
+        doc["clear"] = clear_state(doc["sessionId"])
         sessions.append(doc)
     sessions.sort(key=lambda doc: doc["modifiedAt"], reverse=True)
     return sessions

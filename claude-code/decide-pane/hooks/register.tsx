@@ -128,6 +128,8 @@ async function write($: EngineInterface, isEnded: boolean, endedId?: string): Pr
       root: await $.session.root(),
       repo: repo?.remote ?? null,
       updatedAt: await $.clock.now(),
+      // The context's size, which the Clear section weighs as the status line does.
+      context: (await $.session.usage()).context,
       isEnded,
       error: status.error,
       questions: await read($, questions),
