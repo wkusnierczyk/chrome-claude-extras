@@ -66,7 +66,7 @@
   }
 }
 
-/* Questions section in a Code session's right-hand rail (questions.js). The
+/* Clear and Questions sections in a Code session's right-hand rail (rail.js). The
    rest of its look comes from the rail's own classes, copied at run time. */
 .cce-q {
   align-items: flex-start !important;
@@ -113,10 +113,22 @@ details > summary.cce-head {
   color: #a8660a;
 }
 
+.cce-ok {
+  color: #2f7d4b;
+}
+
 @media (prefers-color-scheme: dark) {
   .cce-warn {
     color: #e0a94a;
   }
+
+  .cce-ok {
+    color: #7cc79a;
+  }
+}
+
+.cce-clear {
+  overflow-wrap: anywhere;
 }
 
 .cce-note {

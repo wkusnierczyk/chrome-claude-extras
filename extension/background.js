@@ -9,22 +9,16 @@ openPanelOnClick();
 
 const HOST = "com.wkusnierczyk.claude_extras";
 
-// The rail section (questions.js) asks for one session's questions by its
-// Remote Control id; content scripts cannot reach the native host themselves.
+// The rail sections (rail.js) ask for one session's record by its Remote
+// Control id; content scripts cannot reach the native host themselves.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "questions" || typeof message.bridgeSessionId !== "string") return false;
+  if (message?.type !== "session" || typeof message.bridgeSessionId !== "string") return false;
   chrome.runtime.sendNativeMessage(HOST, { type: "get", bridgeSessionId: message.bridgeSessionId }, (reply) => {
     if (chrome.runtime.lastError || !reply || reply.error) {
       sendResponse({ error: chrome.runtime.lastError?.message || reply?.error || "no reply" });
       return;
     }
-    // A failed refresh in the mod comes as the session's error, beside the
-    // list it kept.
-    sendResponse({
-      questions: reply.session ? reply.session.questions : null,
-      isEnded: Boolean(reply.session?.isEnded),
-      sessionError: typeof reply.session?.error === "string" ? reply.session.error : "",
-    });
+    sendResponse({ session: reply.session || null });
   });
   return true;
 });

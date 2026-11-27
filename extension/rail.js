@@ -1,16 +1,18 @@
-// Adds a "Questions" section to the right-hand rail of a Claude Code session
-// on claude.ai/code (beside Environment, Context, Outputs and Changes): the
-// questions the session has asked, as the decide-pane mod writes them, read
-// through the native host by the background worker. The session is matched
-// by its Remote Control id, the one in the page's address.
+// Adds two sections to the right-hand rail of a Claude Code session on
+// claude.ai/code (beside Environment, Context, Outputs and Changes), from
+// what the decide-pane mod and the session write, read through the native
+// host by the background worker:
+//   Clear      whether the session may be cleared now, as the status line says
+//   Questions  the questions the session has asked, by state
+// The session is matched by its Remote Control id, the one in the address.
 (() => {
-  // claude.ai's markup is not a public API. If an update breaks the section,
-  // these selectors are the place to fix it. Its look is copied from the
+  // claude.ai's markup is not a public API. If an update breaks the sections,
+  // these selectors are the place to fix it. Their look is copied from the
   // rail's own sections at run time, so it follows the site's styling.
   const SEL = {
     section: "section[data-rail-section]",
     // A section's card. The rail draws the line above a section from this
-    // attribute on its card, so the section's own card carries it too.
+    // attribute on its card, so the sections' own cards carry it too.
     card: "[data-rail-card]",
     cardAttr: "data-rail-card",
     // The header row, its fold button, and the chevron icon inside it.
@@ -45,20 +47,24 @@
   ];
 
   const POLL_MS = 3000;
-  // Replies in a row without the session (its file mid-write) that keep
-  // the list shown before it is dropped.
-  const KEEP_MISSES = 2;
-  const MARK = "data-cce-questions";
+  const MARK = "data-cce-rail";
+  const ORDER = ["clear", "questions"];
   const HEADINGS = { open: "Open", progressing: "Progressing", answered: "Answered" };
+  // Replies in a row without the session (its file mid-write) that keep
+  // what was shown before it is dropped.
+  const KEEP_MISSES = 2;
+  // The status line's thresholds (~/.claude/statusline.sh), in tokens.
+  const CLEAR_AT = 60000;
+  const BOUNDARY_AT = 300000;
 
-  // What is shown, and for which session: a list is never drawn on another
+  // What is shown, and for which session: nothing is drawn on another
   // session's page, even for the moment before that page's first reply.
   let shownFor = null;
-  let questions = null; // null until a reply has the session
+  let session = null; // the host's record of the session, null until found
   let misses = 0; // replies in a row without the session
   let error = "";
-  let lastShown = "";
-  let isCollapsed = false;
+  const lastShown = {};
+  const isCollapsed = { clear: false, questions: false };
   let isAnsweredOpen = false;
   let isPolling = false;
   let timer = 0;
@@ -89,6 +95,14 @@
     } catch {
       return null;
     }
+  }
+
+  function ago(seconds) {
+    const s = Math.max(0, Math.round(Date.now() / 1000 - seconds));
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+    return `${Math.floor(s / 86400)} d ago`;
   }
 
   // The visible message box, the last one, as content.js finds it; its
@@ -145,15 +159,92 @@
     };
   }
 
-  function chevron(t) {
+  function chevron(t, collapsed) {
     if (!t.chevron) return null;
     const icon = t.chevron.cloneNode(true);
     icon.classList.remove(...CHEVRON_FOLDED, ...CHEVRON_OPEN);
-    icon.classList.add(...(isCollapsed ? CHEVRON_FOLDED : CHEVRON_OPEN));
-    if (isCollapsed) icon.removeAttribute("data-open");
+    icon.classList.add(...(collapsed ? CHEVRON_FOLDED : CHEVRON_OPEN));
+    if (collapsed) icon.removeAttribute("data-open");
     else icon.setAttribute("data-open", "");
     return icon;
   }
+
+  // One rail card: a header that folds it, with a short summary beside the
+  // title, and its body.
+  function card(t, name, title, summary, body) {
+    const collapsed = isCollapsed[name];
+    const toggle = el(
+      "button",
+      { className: t.headerButton, type: "button", ariaExpanded: String(!collapsed) },
+      el("span", { className: "shrink-0", textContent: title }),
+      summary,
+      chevron(t, collapsed),
+    );
+    toggle.addEventListener("click", () => {
+      isCollapsed[name] = !isCollapsed[name];
+      delete lastShown[name];
+      render();
+    });
+    const section = el(
+      "section",
+      { className: t.section },
+      el("div", { className: t.headerRow }, el("div", { className: "flex min-w-0 flex-1" }, toggle)),
+      collapsed ? null : body,
+    );
+    if (!collapsed) section.setAttribute("data-open", "");
+    const node = el("div", { className: t.card }, section);
+    node.setAttribute(SEL.cardAttr, "");
+    node.setAttribute(MARK, name);
+    return node;
+  }
+
+  const note = (text, className = "cce-dim") => el("p", { className: `${className} cce-note`, textContent: text });
+
+  // ---------- Clear ----------
+
+  // The status line's rule: the session's own word (busy or done) first,
+  // then the context's size, counted 0 when unknown as the status line does.
+  function clearVerdict() {
+    if (session?.isEnded) return { label: "Session ended", tone: "cce-dim", why: "cleared or quit" };
+    const state = session?.clear;
+    const tokens = session?.context?.tokens ?? 0;
+    if (state?.state === "busy") {
+      return { label: "Don't clear yet", tone: "cce-warn", why: state.why };
+    }
+    if (state?.state === "done") {
+      return tokens < CLEAR_AT
+        ? { label: "Clear when you like", tone: "cce-ok", why: state.why }
+        : { label: "Clear now", tone: "cce-ok", why: state.why };
+    }
+    if (tokens >= BOUNDARY_AT) {
+      return { label: "Clear at the next boundary", tone: "cce-warn", why: "the context is large" };
+    }
+    return { label: "Nothing recorded", tone: "cce-dim", why: "" };
+  }
+
+  function buildClear(t) {
+    if (session === null) {
+      return card(t, "clear", "Clear", null, el("div", { className: `${t.listBody} cce-body` }, error ? note(error, "cce-warn") : note("Nothing from this session yet.")));
+    }
+    const verdict = clearVerdict();
+    const tokens = session.context?.tokens;
+    const facts = session.isEnded
+      ? []
+      : [
+          typeof tokens === "number" ? `context ${Math.round(tokens / 1000)}k` : null,
+          typeof session.clear?.at === "number" ? `set ${ago(session.clear.at)}` : null,
+        ].filter(Boolean);
+    const body = el(
+      "div",
+      { className: `${t.listBody} cce-body` },
+      error ? note(error, "cce-warn") : null,
+      el("p", { className: "cce-note cce-clear" }, el("span", { className: verdict.tone, textContent: verdict.label }), verdict.why ? `: ${verdict.why}` : ""),
+      facts.length ? note(facts.join(" · ")) : null,
+    );
+    return card(t, "clear", "Clear", el("span", { className: verdict.tone, textContent: ` ${verdict.label}` }), body);
+  }
+
+  // ---------- Questions ----------
 
   function questionRow(q, t) {
     const link = q.link ? safeLink(q.link) : null;
@@ -185,28 +276,16 @@
     return row;
   }
 
-  function build(t) {
+  function buildQuestions(t) {
+    const questions = Array.isArray(session?.questions) && !session.isEnded ? session.questions : null;
     const list = questions || [];
     const byState = (state) => list.filter((q) => q.state === state);
     const pending = byState("open").length + byState("progressing").length;
 
-    const toggle = el(
-      "button",
-      { className: t.headerButton, type: "button", ariaExpanded: String(!isCollapsed) },
-      el("span", { className: "shrink-0", textContent: "Questions" }),
-      el("span", { className: "cce-dim cce-count", textContent: questions === null ? "" : ` ${pending} open` }),
-      chevron(t),
-    );
-    toggle.addEventListener("click", () => {
-      isCollapsed = !isCollapsed;
-      lastShown = "";
-      render();
-    });
-
     const body = el("div", { className: `${t.listBody} cce-body` });
-    if (error) body.append(el("p", { className: "cce-warn cce-note", textContent: error }));
+    if (error) body.append(note(error, "cce-warn"));
     if (questions === null) {
-      if (!error) body.append(el("p", { className: "cce-dim cce-note", textContent: "No questions from this session yet." }));
+      if (!error) body.append(note("No questions from this session yet."));
     } else {
       for (const state of ["open", "progressing"]) {
         const rows = byState(state);
@@ -225,20 +304,23 @@
         details.addEventListener("toggle", () => (isAnsweredOpen = details.open));
         body.append(details);
       }
-      if (list.length === 0) body.append(el("p", { className: "cce-dim cce-note", textContent: "No questions yet." }));
+      if (list.length === 0) body.append(note("No questions yet."));
     }
+    const summary = questions === null ? null : el("span", { className: "cce-dim", textContent: ` ${pending} open` });
+    return card(t, "questions", "Questions", summary, body);
+  }
 
-    const section = el(
-      "section",
-      { className: t.section },
-      el("div", { className: t.headerRow }, el("div", { className: "flex min-w-0 flex-1" }, toggle)),
-      isCollapsed ? null : body,
-    );
-    if (!isCollapsed) section.setAttribute("data-open", "");
-    const card = el("div", { className: t.card }, section);
-    card.setAttribute(SEL.cardAttr, "");
-    card.setAttribute(MARK, "");
-    return card;
+  // ---------- placing ----------
+
+  const BUILD = { clear: buildClear, questions: buildQuestions };
+
+  // What each section shows, to redraw it only when that changed. The clear
+  // section's ages are coarse enough to redraw on each change of minute.
+  function keyOf(name) {
+    // Both sections change when the session ends, whatever else stays.
+    const common = [shownFor, error, isCollapsed[name], Boolean(session?.isEnded)];
+    if (name === "questions") return JSON.stringify([...common, session?.questions ?? null]);
+    return JSON.stringify([...common, session?.clear ?? null, session?.context ?? null, Math.floor(Date.now() / 60000)]);
   }
 
   // Forgets what was shown when the page moved to another session.
@@ -246,32 +328,40 @@
     const id = sessionId();
     if (id === shownFor) return false;
     shownFor = id;
-    questions = null;
+    session = null;
     misses = 0;
     error = "";
-    lastShown = "";
+    for (const name of ORDER) delete lastShown[name];
     return true;
   }
 
-  // Puts the section after Context, or redraws it when what it shows
-  // changed. A re-render of the rail that drops it puts it back on the next
-  // mutation.
+  // Puts the sections after Context, in order, or redraws one when what it
+  // shows changed. A re-render of the rail that drops them puts them back
+  // on the next mutation.
   function render() {
     const moved = follow();
-    const existing = document.querySelector(`[${MARK}]`);
     if (!shownFor) {
-      existing?.remove();
+      document.querySelectorAll(`[${MARK}]`).forEach((node) => node.remove());
       return;
     }
     if (moved) poll();
     const t = template();
     if (!t || !t.anchor) return;
-    const key = JSON.stringify([shownFor, questions, error, isCollapsed]);
-    if (existing && existing.isConnected && key === lastShown) return;
-    lastShown = key;
-    const card = build(t);
-    if (existing) existing.replaceWith(card);
-    else t.anchor.after(card);
+    let after = t.anchor;
+    for (const name of ORDER) {
+      const existing = document.querySelector(`[${MARK}="${name}"]`);
+      const key = keyOf(name);
+      if (existing && existing.isConnected && key === lastShown[name]) {
+        if (existing.previousElementSibling !== after) after.after(existing);
+        after = existing;
+        continue;
+      }
+      lastShown[name] = key;
+      const node = BUILD[name](t);
+      if (existing) existing.replaceWith(node);
+      if (node.previousElementSibling !== after) after.after(node);
+      after = node;
+    }
   }
 
   // The extension was reloaded or removed: this copy can no longer reach it,
@@ -279,7 +369,7 @@
   function retire() {
     clearInterval(timer);
     observer?.disconnect();
-    document.querySelector(`[${MARK}]`)?.remove();
+    document.querySelectorAll(`[${MARK}]`).forEach((node) => node.remove());
   }
 
   function poll() {
@@ -291,21 +381,20 @@
     }
     isPolling = true;
     try {
-      chrome.runtime.sendMessage({ type: "questions", bridgeSessionId: id }, (reply) => {
+      chrome.runtime.sendMessage({ type: "session", bridgeSessionId: id }, (reply) => {
         isPolling = false;
         if (id !== sessionId()) return;
         if (chrome.runtime.lastError || !reply || reply.error) {
-          // Keep the last list; say why it is not updating.
+          // Keep what is shown; say why it is not updating.
           error = `Not updating: ${chrome.runtime.lastError?.message || reply?.error || "no reply"}`;
         } else {
           // The mod could not refresh the list: show the one it kept, and why.
-          const why = reply.isEnded ? "" : reply.sessionError || "";
+          const why = reply.session && !reply.session.isEnded && typeof reply.session.error === "string" ? reply.session.error : "";
           error = why && why[0].toUpperCase() + why.slice(1);
           // A session missing from a reply or two (its file mid-write) keeps
-          // its list; longer, or ended (cleared or quit), it is gone.
-          const list = Array.isArray(reply.questions) && !reply.isEnded ? reply.questions : null;
-          misses = list || reply.isEnded ? 0 : misses + 1;
-          if (list || reply.isEnded || misses > KEEP_MISSES) questions = list;
+          // what it showed; longer, it is gone.
+          misses = reply.session ? 0 : misses + 1;
+          if (reply.session || misses > KEEP_MISSES) session = reply.session || null;
         }
         render();
       });
@@ -320,7 +409,9 @@
     if (scheduled) return;
     scheduled = setTimeout(() => {
       scheduled = 0;
-      if (!document.querySelector(`[${MARK}]`)) lastShown = "";
+      for (const name of ORDER) {
+        if (!document.querySelector(`[${MARK}="${name}"]`)) delete lastShown[name];
+      }
       render();
     }, 200);
   });

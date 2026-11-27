@@ -4,6 +4,9 @@
 const HOST = "com.wkusnierczyk.claude_extras";
 const POLL_MS = 3000;
 const HEADINGS = { open: "Open", progressing: "Progressing", answered: "Answered" };
+// The status line's thresholds (~/.claude/statusline.sh), in tokens.
+const CLEAR_AT = 60000;
+const BOUNDARY_AT = 300000;
 
 const sessionSelect = document.getElementById("session");
 const updated = document.getElementById("updated");
@@ -141,13 +144,13 @@ function render(sessions) {
   }
 
   const questions = Array.isArray(session.questions) ? session.questions : [];
-  const shown = JSON.stringify([session.sessionId, session.error || "", questions]);
+  const shown = JSON.stringify([session.sessionId, session.error || "", questions, session.clear || null, session.context?.tokens ?? null]);
   if (shown === lastList) return;
   lastList = shown;
   showMessage(session.error || "", Boolean(session.error));
 
   const byState = (state) => questions.filter((q) => q.state === state);
-  const sections = [];
+  const sections = [clearLine(session)].filter(Boolean);
   for (const state of ["open", "progressing"]) {
     const rows = byState(state);
     if (rows.length === 0) continue;
@@ -166,6 +169,28 @@ function render(sessions) {
   }
   if (questions.length === 0) sections.push(el("p", { textContent: "No questions in this session yet." }));
   list.replaceChildren(...sections);
+}
+
+// Whether the session may be cleared, by the status line's rule (as rail.js).
+function clearLine(session) {
+  const state = session.clear;
+  // Unknown counts as 0, as the status line counts it.
+  const tokens = session.context?.tokens ?? 0;
+  let verdict = null;
+  if (state?.state === "busy") verdict = ["Don't clear yet", "warn", state.why];
+  else if (state?.state === "done") verdict = [tokens < CLEAR_AT ? "Clear when you like" : "Clear now", "ok", state.why];
+  else if (tokens >= BOUNDARY_AT) verdict = ["Clear at the next boundary", "warn", "the context is large"];
+  if (!verdict) return null;
+  const [label, tone, why] = verdict;
+  return el(
+    "p",
+    { className: "clear" },
+    el("span", { className: tone, textContent: label }),
+    why ? `: ${why}` : "",
+    typeof session.context?.tokens === "number"
+      ? el("span", { className: "dim", textContent: ` · context ${Math.round(session.context.tokens / 1000)}k` })
+      : null,
+  );
 }
 
 function current(sessions) {
