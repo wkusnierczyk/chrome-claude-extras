@@ -1,0 +1,148 @@
+:root {
+  --bg: #faf9f5;
+  --fg: #1f1e1d;
+  --dim: #6b6a66;
+  --line: #e5e3db;
+  --hover: #f0eee6;
+  --accent: #c96442;
+  --warn: #a8660a;
+  --ok: #2f7d4b;
+  --error: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #262624;
+    --fg: #f5f4ef;
+    --dim: #a3a19b;
+    --line: #3d3c38;
+    --hover: #30302e;
+    --accent: #d97757;
+    --warn: #e0a94a;
+    --ok: #7cc79a;
+    --error: #f2b8b5;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 12px 16px 24px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.45 system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+#updated {
+  color: var(--dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#message {
+  color: var(--dim);
+}
+
+#message.error {
+  color: var(--error);
+}
+
+#message code {
+  font-size: 12px;
+}
+
+h2 {
+  margin: 16px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+details > summary {
+  margin: 16px 0 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.q {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.q:hover,
+.q:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.q .n {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.q .issue,
+.q .answer {
+  color: var(--dim);
+}
+
+.q .still {
+  color: var(--warn);
+}
+
+.q a {
+  color: var(--accent);
+}
+
+.clear {
+  margin: 4px 0 8px;
+}
+
+.clear .ok {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.clear .warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.clear .dim {
+  color: var(--dim);
+}
+
+#toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--fg);
+  color: var(--bg);
+}

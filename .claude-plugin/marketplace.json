@@ -1,0 +1,14 @@
+{
+  "name": "chrome-claude-extras",
+  "description": "Claude Code mods that go with the Extras for Claude Chrome extension",
+  "owner": {
+    "name": "Waclaw Kusnierczyk"
+  },
+  "plugins": [
+    {
+      "name": "decide-pane",
+      "source": "./claude-code/decide-pane",
+      "description": "A pane beside the chat listing the questions this session has asked you, by state; also feeds the extension's Questions side panel"
+    }
+  ]
+}
