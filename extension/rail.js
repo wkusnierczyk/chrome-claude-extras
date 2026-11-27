@@ -387,7 +387,9 @@
           // Keep what is shown; say why it is not updating.
           error = `Not updating: ${chrome.runtime.lastError?.message || reply?.error || "no reply"}`;
         } else {
-          error = "";
+          // The mod could not refresh the list: show the one it kept, and why.
+          const why = reply.session && !reply.session.isEnded && typeof reply.session.error === "string" ? reply.session.error : "";
+          error = why && why[0].toUpperCase() + why.slice(1);
           // A session missing from a reply or two (its file mid-write) keeps
           // what it showed; longer, it is gone.
           misses = reply.session ? 0 : misses + 1;
