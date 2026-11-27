@@ -18,7 +18,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ error: chrome.runtime.lastError?.message || reply?.error || "no reply" });
       return;
     }
-    sendResponse({ questions: reply.session ? reply.session.questions : null, isEnded: Boolean(reply.session?.isEnded) });
+    // A failed refresh in the mod comes as the session's error, beside the
+    // list it kept.
+    sendResponse({
+      questions: reply.session ? reply.session.questions : null,
+      isEnded: Boolean(reply.session?.isEnded),
+      sessionError: typeof reply.session?.error === "string" ? reply.session.error : "",
+    });
   });
   return true;
 });

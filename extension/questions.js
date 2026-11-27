@@ -298,7 +298,9 @@
           // Keep the last list; say why it is not updating.
           error = `Not updating: ${chrome.runtime.lastError?.message || reply?.error || "no reply"}`;
         } else {
-          error = "";
+          // The mod could not refresh the list: show the one it kept, and why.
+          const why = reply.isEnded ? "" : reply.sessionError || "";
+          error = why && why[0].toUpperCase() + why.slice(1);
           // A session missing from a reply or two (its file mid-write) keeps
           // its list; longer, or ended (cleared or quit), it is gone.
           const list = Array.isArray(reply.questions) && !reply.isEnded ? reply.questions : null;
