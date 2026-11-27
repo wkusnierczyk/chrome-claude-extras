@@ -317,7 +317,8 @@
   // What each section shows, to redraw it only when that changed. The clear
   // section's ages are coarse enough to redraw on each change of minute.
   function keyOf(name) {
-    const common = [shownFor, error, isCollapsed[name]];
+    // Both sections change when the session ends, whatever else stays.
+    const common = [shownFor, error, isCollapsed[name], Boolean(session?.isEnded)];
     if (name === "questions") return JSON.stringify([...common, session?.questions ?? null]);
     return JSON.stringify([...common, session?.clear ?? null, session?.context ?? null, Math.floor(Date.now() / 60000)]);
   }
