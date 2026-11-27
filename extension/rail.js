@@ -266,13 +266,20 @@
     row.addEventListener("click", (event) => {
       if (!event.target.closest("a")) answer(q);
     });
-    // A held key repeats into the message box once it has the focus, where
-    // Enter would send; act on the first press only.
+    // A held key would repeat into the message box once it has the focus,
+    // where Enter sends; act when the key is released.
+    let pressed = null;
     row.addEventListener("keydown", (event) => {
       if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
       event.preventDefault();
-      if (!event.repeat) answer(q);
+      if (!event.repeat) pressed = event.key;
     });
+    row.addEventListener("keyup", (event) => {
+      if (event.target !== row || event.key !== pressed) return;
+      pressed = null;
+      answer(q);
+    });
+    row.addEventListener("blur", () => (pressed = null));
     return row;
   }
 

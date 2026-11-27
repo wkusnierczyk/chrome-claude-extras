@@ -128,8 +128,11 @@ function render(sessions) {
   const session = current(sessions);
   updated.textContent = ago(session.modifiedAt);
 
+  // A focused menu is left alone, unless its session has gone and the list
+  // below would show another one under its label.
   const options = JSON.stringify([sessions.map((s) => [s.sessionId, sessionName(s)]), session.sessionId]);
-  if (options !== lastOptions && document.activeElement !== sessionSelect) {
+  const isMenuStale = sessionSelect.value !== session.sessionId;
+  if (options !== lastOptions && (document.activeElement !== sessionSelect || isMenuStale)) {
     lastOptions = options;
     sessionSelect.disabled = false;
     sessionSelect.replaceChildren(
